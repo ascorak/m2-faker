@@ -1,10 +1,7 @@
 <?php
+namespace Ascorak\Faker\Model\Faker;
 
-declare(strict_types=1);
-
-namespace Agranjeon\Faker\Model\Faker;
-
-use Agranjeon\Faker\Api\FakerInterface;
+use Ascorak\Faker\Api\FakerInterface;
 use Magento\Customer\Api\AddressRepositoryInterface;
 use Magento\Customer\Api\Data\AddressInterfaceFactory;
 use Magento\Directory\Model\ResourceModel\Region\Collection;

@@ -1,8 +1,5 @@
 <?php
-
-declare(strict_types=1);
-
-namespace Agranjeon\Faker\Api;
+namespace Ascorak\Faker\Api;
 
 use Symfony\Component\Console\Output\OutputInterface;
 

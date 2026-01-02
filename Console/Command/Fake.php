@@ -102,10 +102,9 @@ class Fake extends Command
         );
         $currentMode = $mode->getMode() ?: State::MODE_DEFAULT;
 
-        if ($currentMode == State::MODE_PRODUCTION && !$this->scopeConfig->getValue('faker/global/enabled_prod')) {
+        if ($currentMode == State::MODE_PRODUCTION) {
             $io->error('Generation of fake data is disabled');
-
-            return;
+            return Command::FAILURE;
         }
 
         $requestedCodes = $input->getArgument(self::CODE_ARGUMENT);

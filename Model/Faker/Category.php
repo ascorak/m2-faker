@@ -1,8 +1,5 @@
 <?php
-
-declare(strict_types=1);
-
-namespace Agranjeon\Faker\Model\Faker;
+namespace Ascorak\Faker\Model\Faker;
 
 use Agranjeon\Faker\Api\FakerInterface;
 use Faker\Generator;

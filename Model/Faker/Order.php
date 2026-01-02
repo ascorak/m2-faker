@@ -1,10 +1,7 @@
 <?php
+namespace Ascorrak\Faker\Model\Faker;
 
-declare(strict_types=1);
-
-namespace Agranjeon\Faker\Model\Faker;
-
-use Agranjeon\Faker\Api\FakerInterface;
+use Ascorrak\Faker\Api\FakerInterface;
 use Magento\Catalog\Model\ProductFactory;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 use Magento\CatalogInventory\Helper\Stock;

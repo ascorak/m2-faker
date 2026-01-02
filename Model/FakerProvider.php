@@ -1,10 +1,7 @@
 <?php
+namespace Ascorak\Faker\Model;
 
-declare(strict_types=1);
-
-namespace Agranjeon\Faker\Model;
-
-use Agranjeon\Faker\Api\FakerInterface;
+use Ascorak\Faker\Api\FakerInterface;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
