@@ -1,6 +1,7 @@
 <?php
 namespace Ascorak\Faker\Model\Faker;
 
+use Ascorak\Faker\Api\Command\ConfigProviderInterface;
 use Ascorak\Faker\Api\FakerInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Model\Customer as CustomerModel;
@@ -12,6 +13,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Store\Model\Store;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
@@ -59,7 +61,7 @@ class Customer extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(OutputInterface $output): void
+    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
     {
         /** @var int[] $customerGroupIds */
         $customerGroupIds = $this->customerGroupCollectionFactory->create()->getAllIds();

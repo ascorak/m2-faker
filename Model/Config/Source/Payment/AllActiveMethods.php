@@ -1,30 +1,31 @@
 <?php
+namespace Ascorak\Faker\Model\Config\Source\Payment;
 
-declare(strict_types=1);
-
-namespace Agranjeon\Faker\Model\Config\Source\Payment;
+use Magento\Framework\Option\ArrayInterface;
+use Magento\Payment\Helper\Data;
+use Magento\Payment\Model\Config;
 
 /**
  * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
  */
-class AllActiveMethods implements \Magento\Framework\Option\ArrayInterface
+class AllActiveMethods implements ArrayInterface
 {
     /**
-     * @var \Magento\Payment\Helper\Data
+     * @var Data
      */
     protected $_paymentData;
     /**
-     * @var \Magento\Payment\Model\Config $_paymentConfig
+     * @var Config $_paymentConfig
      */
     protected $_paymentConfig;
 
     /**
      * AllActiveMethods constructor
      *
-     * @param \Magento\Payment\Helper\Data  $paymentData
-     * @param \Magento\Payment\Model\Config $paymentConfig
+     * @param Data  $paymentData
+     * @param Config $paymentConfig
      */
-    public function __construct(\Magento\Payment\Helper\Data $paymentData, \Magento\Payment\Model\Config $paymentConfig)
+    public function __construct(Data $paymentData, Config $paymentConfig)
     {
         $this->_paymentData   = $paymentData;
         $this->_paymentConfig = $paymentConfig;

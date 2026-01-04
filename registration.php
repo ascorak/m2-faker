@@ -1,9 +1,5 @@
 <?php
 
-declare(strict_types=1);
+use Magento\Framework\Component\ComponentRegistrar;
 
-\Magento\Framework\Component\ComponentRegistrar::register(
-    \Magento\Framework\Component\ComponentRegistrar::MODULE,
-    'Agranjeon_Faker',
-    __DIR__
-);
+ComponentRegistrar::register(ComponentRegistrar::MODULE, 'Ascorak_Faker', __DIR__);

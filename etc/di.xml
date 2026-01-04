@@ -1,24 +1,36 @@
 <?xml version="1.0"?>
 
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- PREFERENCES -->
+    <preference for="Ascorak\Faker\Api\FakerProviderInterface" type="Ascorak\Faker\Model\FakerProvider" />
+
+    <!-- ARGUMENTS -->
     <type name="Magento\Framework\Console\CommandList">
         <arguments>
             <argument name="commands" xsi:type="array">
-                <item name="agranjeon_faker_fake" xsi:type="object">Ascorak\Faker\Console\Command\Fake</item>
+                <item name="ascorak_faker_fake" xsi:type="object">Ascorak\Faker\Console\Command\Fake</item>
             </argument>
         </arguments>
     </type>
 
-    <type name="Agranjeon\Faker\Model\FakerProvider">
+    <type name="Ascorak\Faker\Model\FakerProvider">
         <arguments>
             <argument name="fakerList" xsi:type="array">
-                <item name="category" xsi:type="object">Ascorak\Faker\Model\Faker\Category</item>
-                <item name="product" xsi:type="object">Ascorak\Faker\Model\Faker\Product</item>
-                <item name="customer" xsi:type="object">Ascorak\Faker\Model\Faker\Customer</item>
-                <item name="customer_address" xsi:type="object">Ascorak\Faker\Model\Faker\CustomerAddress</item>
-                <item name="order" xsi:type="object">Ascorak\Faker\Model\Faker\Order</item>
-                <item name="invoice" xsi:type="object">Ascorak\Faker\Model\Faker\Invoice</item>
-                <item name="shipment" xsi:type="object">Ascorak\Faker\Model\Faker\Shipment</item>
+                <item name="category" xsi:type="object">Ascorak\Faker\Model\Faker\Category\Proxy</item>
+                <item name="product" xsi:type="object">Ascorak\Faker\Model\Faker\Product\Proxy</item>
+                <item name="customer" xsi:type="object">Ascorak\Faker\Model\Faker\Customer\Proxy</item>
+                <item name="customer_address" xsi:type="object">Ascorak\Faker\Model\Faker\CustomerAddress\Proxy</item>
+                <item name="order" xsi:type="object">Ascorak\Faker\Model\Faker\Order\Proxy</item>
+                <item name="invoice" xsi:type="object">Ascorak\Faker\Model\Faker\Invoice\Proxy</item>
+                <item name="shipment" xsi:type="object">Ascorak\Faker\Model\Faker\Shipment\Proxy</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Ascorak\Faker\Model\Command\ConfigProviderStrategy">
+        <arguments>
+            <argument name="configProviders" xsi:type="array">
+                <item name="order" xsi:type="object">Ascorak\Faker\Model\Command\ConfigProvider\Order\Proxy</item>
             </argument>
         </arguments>
     </type>

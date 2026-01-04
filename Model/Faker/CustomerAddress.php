@@ -1,6 +1,7 @@
 <?php
 namespace Ascorak\Faker\Model\Faker;
 
+use Ascorak\Faker\Api\Command\ConfigProviderInterface;
 use Ascorak\Faker\Api\FakerInterface;
 use Magento\Customer\Api\AddressRepositoryInterface;
 use Magento\Customer\Api\Data\AddressInterfaceFactory;
@@ -11,6 +12,7 @@ use Magento\Store\Model\ResourceModel\Store\CollectionFactory as StoreCollection
 use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
@@ -69,7 +71,7 @@ class CustomerAddress extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(OutputInterface $output): void
+    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
     {
         $customers = $this->customerCollectionFactory->create();
         $customers->addFieldToFilter('website_id', ['in' => $this->getStoreConfig('faker/global/website_ids')]);

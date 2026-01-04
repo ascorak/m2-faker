@@ -1,15 +1,14 @@
 <?php
+namespace Ascorak\Faker\Console\Command;
 
-declare(strict_types=1);
-
-namespace Agranjeon\Faker\Console\Command;
-
-use Agranjeon\Faker\Model\FakerProvider;
+use Ascorak\Faker\Api\FakerProviderInterface;
+use Ascorak\Faker\Model\FakerProvider;
+use Ascorak\Faker\Model\Command\ConfigProviderStrategy;
+use Exception;
 use Magento\Framework\App\Area;
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\State;
-use Magento\Framework\ObjectManagerInterface;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -20,46 +19,23 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 class Fake extends Command
 {
-    const CODE_ARGUMENT = 'code';
-    /**
-     * @var FakerProvider $fakerProvider
-     */
-    protected $fakerProvider;
-    /**
-     * @var State $appState
-     */
-    protected $appState;
-    /**
-     * @var ScopeConfigInterface $scopeConfig
-     */
-    protected $scopeConfig;
-    /**
-     * @var ObjectManagerInterface $objectManager
-     */
-    protected $objectManager;
+    private const COMMAND_NAME = "ascorak:fake:generate";
+    private const CODE_ARGUMENT = 'code';
+    private const NUMBER_ARGUMENT = 'number';
 
     /**
      * Fake constructor
      *
-     * @param FakerProvider          $fakerProvider
-     * @param State                  $appState
-     * @param ScopeConfigInterface   $scopeConfig
-     * @param ObjectManagerInterface $objectManager
-     * @param string|null            $name
+     * @param FakerProviderInterface $fakerProvider
+     * @param ConfigProviderStrategy $configProviderStrategy
+     * @param State $appState
      */
     public function __construct(
-        FakerProvider $fakerProvider,
-        State $appState,
-        ScopeConfigInterface $scopeConfig,
-        ObjectManagerInterface $objectManager,
-        ?string $name = null
+        private FakerProviderInterface $fakerProvider,
+        private ConfigProviderStrategy $configProviderStrategy,
+        private State $appState,
     ) {
-        parent::__construct($name);
-
-        $this->fakerProvider = $fakerProvider;
-        $this->appState      = $appState;
-        $this->scopeConfig   = $scopeConfig;
-        $this->objectManager = $objectManager;
+        parent::__construct();
     }
 
     /**
@@ -67,62 +43,78 @@ class Fake extends Command
      */
     protected function configure()
     {
-        $this->setName('agranjeon:fake:data')->setDescription('Generate fake data')->setDefinition(
-            [
-                new InputArgument(
-                    self::CODE_ARGUMENT,
-                    InputArgument::REQUIRED | InputArgument::IS_ARRAY,
-                    'Code of the fake data to generate ("all" to generate all fake data)'
-                ),
-            ]
+        $this->setName(self::COMMAND_NAME);
+        $this->setDescription(__('Generate fake data'));
+        $this->addArgument(
+            self::CODE_ARGUMENT,
+            InputArgument::REQUIRED,
+            __('Codes of fake data to generated, separated by commas ("all" to generate all types)')
+        );
+        $this->addArgument(
+            self::NUMBER_ARGUMENT,
+            InputArgument::REQUIRED,
+            __('Number of fake data to generate')
         );
     }
 
     /**
-     * @param InputInterface  $input
+     * @param InputInterface $input
      * @param OutputInterface $output
      *
-     * @return int|void|null
+     * @return int
      */
-    public function execute(InputInterface $input, OutputInterface $output)
+    public function execute(InputInterface $input, OutputInterface $output): int
     {
-        try {
-            $this->appState->setAreaCode(Area::AREA_ADMINHTML);
-        } catch (\Exception $exception) {
+        $io = new SymfonyStyle($input, $output);
+        $numberOfOrder = (int)$input->getArgument(self::NUMBER_ARGUMENT);
+
+        $progressBar = $io->createProgressBar($numberOfOrder);
+        $progressBar->setFormat(
+            "<info>%message%</info> %current%/%max% [%bar%] %percent:3s%% %elapsed% %memory:6s%"
+        );
+        $progressBar->start();
+        $progressBar->setMessage('Orders ...');
+        $progressBar->display();
+
+        for ($i = 0; $i<$numberOfOrder; $i++) {
+            sleep(1);
+            $progressBar->advance();
         }
 
-        $io = new SymfonyStyle($input, $output);
-        /** @var \Magento\Deploy\Model\Mode $mode */
-        $mode        = $this->objectManager->create(
-            \Magento\Deploy\Model\Mode::class,
-            [
-                'input'  => $input,
-                'output' => $output,
-            ]
-        );
-        $currentMode = $mode->getMode() ?: State::MODE_DEFAULT;
+        $progressBar->finish();
+        $io->newLine(2);
 
-        if ($currentMode == State::MODE_PRODUCTION) {
-            $io->error('Generation of fake data is disabled');
+        return Command::SUCCESS;
+        try {
+            $this->appState->setAreaCode(Area::AREA_ADMINHTML);
+        } catch (Exception $e) {
+            $io->error(__('Something went wrong setting area code: %1', $e->getMessage()));
+            return Command::FAILURE;
+        }
+
+        if ($this->appState->getMode() == State::MODE_PRODUCTION) {
+            $io->error(__('You can\'t add fake data while un production mode.'));
             return Command::FAILURE;
         }
 
         $requestedCodes = $input->getArgument(self::CODE_ARGUMENT);
-        $requestedCodes = array_filter(array_map('trim', $requestedCodes), 'strlen');
+        if ($requestedCodes === 'all') {
+            $requestedCodes = $this->fakerProvider->getFakerCodes();
+        } else {
+            $requestedCodes = array_intersect(array_map('trim', explode(',', $requestedCodes)), $this->fakerProvider->getFakerCodes());
+        }
 
-        foreach ($requestedCodes as $code) {
-            if ($code === 'all') {
-                $fakers = $this->fakerProvider->getFakers();
-                foreach ($fakers as $code => $faker) {
-                    $faker->generateFakeData($output);
-                }
+        if (empty($requestedCodes)) {
+            $io->error(__('No code given.'));
+        }
 
-                break;
-            }
-            $faker = $this->fakerProvider->getFaker($code);
-            $faker->generateFakeData($output);
+        foreach ($requestedCodes as $fakerCode) {
+            $fakerConfig = $this->configProviderStrategy->getConfig($fakerCode);
+            $faker = $this->fakerProvider->getFaker($fakerCode);
+            $faker->generateFakeData($fakerConfig, $io);
         }
 
         $io->success('Fake data has been successfully generated');
+        return Command::SUCCESS;
     }
 }

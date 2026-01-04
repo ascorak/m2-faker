@@ -1,17 +1,18 @@
 <?php
 namespace Ascorak\Faker\Api;
 
-use Symfony\Component\Console\Output\OutputInterface;
+use Ascorak\Faker\Api\Command\ConfigProviderInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
+ * @author Grare Olivier <grare.o@gmail.com>
  */
 interface FakerInterface
 {
     /**
-     * @param OutputInterface $output
-     *
+     * @param ConfigProviderInterface $configProvider
+     * @param SymfonyStyle $io
      * @return void
      */
-    public function generateFakeData(OutputInterface $output): void;
+    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void;
 }

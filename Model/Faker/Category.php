@@ -1,7 +1,8 @@
 <?php
 namespace Ascorak\Faker\Model\Faker;
 
-use Agranjeon\Faker\Api\FakerInterface;
+use Ascorak\Faker\Api\FakerInterface;
+use Ascorak\Faker\Api\Command\ConfigProviderInterface;
 use Faker\Generator;
 use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Catalog\Model\CategoryFactory;
@@ -9,6 +10,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Store\Model\ResourceModel\Store\CollectionFactory as StoreCollectionFactory;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
@@ -53,13 +55,13 @@ class Category extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(OutputInterface $output): void
+    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
     {
-        $this->faker    = $this->getFaker(0);
+        /*$this->faker    = $this->getFaker(0);
         $baseCategoryId = (int)$this->getStoreConfig('faker/category/parent');
         $depth          = (int)$this->getStoreConfig('faker/category/max_depth');
 
-        $progressBar = new ProgressBar($output->section(), (int)$this->getStoreConfig('faker/category/max_number'));
+        $progressBar = new ProgressBar($io->section(), (int)$this->getStoreConfig('faker/category/max_number'));
         $progressBar->setFormat(
             '<info>%message%</info> %current%/%max% [%bar%] %percent:3s%% %elapsed% %memory:6s%'
         );
@@ -73,7 +75,7 @@ class Category extends AbstractFaker implements FakerInterface
             $progressBar->display();
         }
 
-        $progressBar->finish();
+        $progressBar->finish();*/
     }
 
     /**

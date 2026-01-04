@@ -2,27 +2,28 @@
 namespace Ascorak\Faker\Model;
 
 use Ascorak\Faker\Api\FakerInterface;
+use Ascorak\Faker\Api\FakerProviderInterface;
 use Magento\Framework\Exception\LocalizedException;
+use InvalidArgumentException;
 
 /**
- * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
+ * @author Grare Olivier <grare.o@gmail.com>
  */
-class FakerProvider
+class FakerProvider implements FakerProviderInterface
 {
-    /**
-     * @var FakerInterface[] $fakerList
-     */
-    private $fakerList;
-
     /**
      * FakerProvider constructor
      *
      * @param array $fakerList
      */
     public function __construct(
-        array $fakerList = []
+        private readonly array $fakerList = []
     ) {
-        $this->fakerList = $fakerList;
+        foreach ($this->fakerList as $faker) {
+            if (!$faker instanceof FakerInterface) {
+                throw new InvalidArgumentException(__('The faker %1 must implements %2', get_class($faker), FakerInterface::class));
+            }
+        }
     }
 
     /**
@@ -36,7 +37,7 @@ class FakerProvider
     public function getFaker(string $code): FakerInterface
     {
         if (!array_key_exists($code, $this->fakerList)) {
-            throw new LocalizedException(__('Faker %s does not exist', $code));
+            throw new LocalizedException(__('Faker %1 does not exist', $code));
         }
 
         return $this->fakerList[$code];
@@ -50,5 +51,13 @@ class FakerProvider
     public function getFakers(): array
     {
         return $this->fakerList;
+    }
+
+    /**
+     * @return array
+     */
+    public function getFakerCodes(): array
+    {
+        return array_keys($this->fakerList);
     }
 }

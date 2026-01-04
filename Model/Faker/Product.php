@@ -1,6 +1,7 @@
 <?php
 namespace Ascorak\Faker\Model\Faker;
 
+use Ascorak\Faker\Api\Command\ConfigProviderInterface;
 use Ascorak\Faker\Api\FakerInterface;
 use Magento\Catalog\Api\CategoryLinkManagementInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
@@ -10,6 +11,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Store\Model\ResourceModel\Store\CollectionFactory as StoreCollectionFactory;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
@@ -64,7 +66,7 @@ class Product extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(OutputInterface $output): void
+    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
     {
         $numberOfProduct = (int)$this->getStoreConfig('faker/product/number');
         $websiteIds      = explode(',', $this->getStoreConfig('faker/global/website_ids'));

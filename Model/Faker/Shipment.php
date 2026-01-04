@@ -1,6 +1,7 @@
 <?php
 namespace Ascorak\Faker\Model\Faker;
 
+use Ascorak\Faker\Api\Command\ConfigProviderInterface;
 use Ascorak\Faker\Api\FakerInterface;
 use Magento\Sales\Model\Convert\Order as OrderConverter;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -11,6 +12,7 @@ use Magento\Sales\Model\Order;
 use Magento\Sales\Model\ResourceModel\Order\Collection;
 use Magento\Sales\Model\ResourceModel\Order\CollectionFactory as OrderCollectionFactory;
 use Magento\Store\Model\ResourceModel\Store\CollectionFactory as StoreCollectionFactory;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
@@ -58,7 +60,7 @@ class Shipment extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(OutputInterface $output): void
+    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
     {
         $orders      = $this->getOrders();
         $progressBar = new ProgressBar(

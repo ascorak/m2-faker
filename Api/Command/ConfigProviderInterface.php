@@ -1,6 +1,7 @@
 <?php
 namespace Ascorak\Faker\Api\Command;
 
+use Ascorak\Faker\Console\Command\Fake;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -19,8 +20,18 @@ interface ConfigProviderInterface
     public function setInput(InputInterface $input): ConfigProviderInterface;
 
     /**
-     * @param string $code
+     * @return string
+     */
+    public function getConfigCode(): string;
+
+    /**
      * @return array
      */
-    public function getConfig(string $code): array;
+    public function getConfig(): array;
+
+    /**
+     * @param Fake $command
+     * @return void
+     */
+    public function applyConfig(Fake $command): void;
 }
