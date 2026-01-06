@@ -10,9 +10,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 interface FakerInterface
 {
     /**
-     * @param ConfigProviderInterface $configProvider
+     * @param array $config
      * @param SymfonyStyle $io
      * @return void
      */
-    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void;
+    public function generateFakeData(array $config, SymfonyStyle $io): void;
 }

@@ -61,7 +61,7 @@ class Customer extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): void
     {
         /** @var int[] $customerGroupIds */
         $customerGroupIds = $this->customerGroupCollectionFactory->create()->getAllIds();

@@ -3,6 +3,7 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
     <!-- PREFERENCES -->
     <preference for="Ascorak\Faker\Api\FakerProviderInterface" type="Ascorak\Faker\Model\FakerProvider" />
+    <preference for="Ascorak\Faker\Api\Generator\CustomerAddressGeneratorInterface" type="Ascorak\Faker\Model\Faker\Generator\CustomerAddressGenerator" />
 
     <!-- ARGUMENTS -->
     <type name="Magento\Framework\Console\CommandList">

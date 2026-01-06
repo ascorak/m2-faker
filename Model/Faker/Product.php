@@ -66,7 +66,7 @@ class Product extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): void
     {
         $numberOfProduct = (int)$this->getStoreConfig('faker/product/number');
         $websiteIds      = explode(',', $this->getStoreConfig('faker/global/website_ids'));

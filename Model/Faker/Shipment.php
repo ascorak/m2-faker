@@ -60,7 +60,7 @@ class Shipment extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): void
     {
         $orders      = $this->getOrders();
         $progressBar = new ProgressBar(

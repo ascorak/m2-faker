@@ -12,20 +12,20 @@ use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Quote\Api\CartManagementInterface;
-use Magento\Quote\Api\Data\ShippingMethodInterface;
 use Magento\Quote\Model\QuoteFactory;
 use Magento\Quote\Model\QuoteManagement;
+use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Store\Model\ResourceModel\Store\CollectionFactory as StoreCollectionFactory;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
-use Symfony\Component\Console\Helper\ProgressBar;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
+use Ascorak\Faker\Model\Command\ConfigProvider\Order as OrderConfigProvider;
 
 /**
- * @author Alexandre Granjeon <alexandre.granjeon@gmail.com>
+ * @author Grare Olivier <grare.o@gmail.com>
  */
 class Order implements FakerInterface
 {
@@ -108,101 +108,84 @@ class Order implements FakerInterface
     }
 
     /**
-     * @param OutputInterface $output
-     *
+     * @param array $config
+     * @param SymfonyStyle $io
      * @return void
+     * @throws NoSuchEntityException
      */
-    public function generateFakeData(ConfigProviderInterface $configProvider, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): void
     {
         $this->initCachedData();
-        $config = $configProvider->getConfig();
 
-        $progressBar = $io->createProgressBar($config['numberOfOrders']);
+        $progressBar = $io->createProgressBar($config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS]);
         $progressBar->setFormat('<info>%message%</info> %current%/%max% [%bar%] %percent:3s%% %elapsed% %memory:6s%');
         $progressBar->start();
         $progressBar->setMessage('Orders ...');
         $progressBar->display();
 
-        list($customerNumber, $guestNumber) = match ($config['guestMode']) {
-            'guest' => ['customerNumber' => 0, 'guestNumber' => $config['numberOfOrders']],
-            'customer' => ['customerNumber' => $config['numberOfOrders'], 'guestNumber' => 0],
-            'both' => (function() use($config) {
-                $customerNumber = rand(1, $config['numberOfOrders']);
-                $guestNumber = $config['numberOfOrders'] - $customerNumber;
-                return ['customerNumber' => $customerNumber, 'guestNumber' => $guestNumber];
-            })(),
+        $customerNumber = match ($config[OrderConfigProvider::IDX_GUEST_MODE]) {
+            OrderConfigProvider::GUEST_MODE_VALUE_GUEST => 0,
+            OrderConfigProvider::GUEST_MODE_VALUE_CUSTOMER => $config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS],
+            OrderConfigProvider::GUEST_MODE_VALUE_BOTH => rand(1, $config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS]),
             default => throw new \Exception(__("Problem\n"))
         };
 
         for($i = 0; $i < $customerNumber; $i++) {
-            $this->createCustomerOrder($config);
-        }
-
-        for($i = 0; $i < $guestNumber; $i++) {
-            $this->createGuestOrder($config);
-        }
-
-        $e = 0;
-        foreach ($customers as $customer) {
-            $e++;
-            $store = $this->storeManager->getStore($customer->getStoreId());
-            if (!$store->getIsActive()) {
-                continue;
+            if ($i < $customerNumber) {
+                $order = $this->createOrder($config, $this->getRandomCustomer());
+            } else {
+                $order = $this->createOrder($config);
             }
-            $availableShippingMethods = explode(',', $this->getStoreConfig('faker/order/shipping_method', $store));
-            $availablePaymentMethods  = explode(',', $this->getStoreConfig('faker/order/payment_method', $store));
 
-            $numberOfOrders = $this->getStoreConfig('faker/order/number', $store);
-            for ($i = 0; $i < $numberOfOrders; $i++) {
-                $shippingMethod = $availableShippingMethods[array_rand($availableShippingMethods)];
-                $paymentMethod  = $availablePaymentMethods[array_rand($availablePaymentMethods)];
-
-                $quote = $this->quoteFactory->create();
-                $quote->setStore($store);
-                $quote->setCurrency();
-                $quote->assignCustomer($customer);
-
-                $shippingAddress = $customer->getAddresses();
-                $numberOfItems   = rand(
-                    (int)$this->getStoreConfig('faker/order/min_items_number', $store),
-                    (int)$this->getStoreConfig('faker/order/max_items_number', $store)
-                );
-
-                for ($i = 0; $i < $numberOfItems; $i++) {
-                    try {
-                        $product = $this->productFactory->create()->load($productIds[array_rand($productIds)]);
-                        $quote->addProduct(
-                            $product,
-                            rand(1, 3) // qty
-                        );
-                    } catch (\Exception $exception) {
-                    }
-                }
-                if (count($quote->getItemsCollection()->getItems()) == 0) {
-                    continue;
-                }
-
-                $quote->getBillingAddress()->importCustomerAddressData(reset($shippingAddress));
-                $quote->getShippingAddress()->importCustomerAddressData(reset($shippingAddress));
-
-                $shippingAddress = $quote->getShippingAddress();
-                $shippingAddress->setCollectShippingRates(1)->collectShippingRates()->setShippingMethod(
-                    $shippingMethod
-                );
-
-                $quote->setPaymentMethod($paymentMethod);
-                $quote->setInventoryProcessed(false);
-                try {
-                    $quote->save();
-                    $quote->getPayment()->importData(['method' => $paymentMethod]);
-                    $quote->collectTotals()->save();
-                    $this->quoteManagement->submit($quote);
-                } catch (\Exception $exception) {
-                }
-            }
             $progressBar->advance();
         }
         $progressBar->finish();
+    }
+
+    private function createOrder(array $config, ?CustomerInterface $customer = null): OrderInterface
+    {
+        // create quote
+        $quote = $this->quoteFactory->create();
+        $quote->setStoreId(0); // admin store
+        $quote->setInventoryProcessed(false);
+
+        // add product
+        $itemNumber = rand(1, $config[OrderConfigProvider::IDX_MAX_ITEMS_PER_ORDER]);
+        for($i = 0; $i < $itemNumber; $i++) {
+            $product = $this->getRandomProduct($this->getProductType());
+            $quote->addProduct($product, rand(1, $config[OrderConfigProvider::IDX_MAX_QTY_PER_ITEM]));
+        }
+
+        // add customer data
+        if ($customer) {
+            $customerAddresses = $customer->getAddresses();
+            if (empty($customerAddresses)) {
+                // TODO: add dummy address to $customerAddresses and add it to the customer
+            }
+            $quote->assignCustomerWithAddressChange(
+                $customer,
+                $customerAddresses[array_rand($customerAddresses)],
+                $customerAddresses[array_rand($customerAddresses)]
+            );
+        } else {
+            // TODO: add dummy customer data to quote
+        }
+        $quote->setCollectShippingRates(1)->collectShippingRates();
+
+        // add shipment and payment
+        $quote->setShippingMethod($this->getRandomShippingMethod());
+        $paymentMethod = $this->getRandomPaymentMethod();
+        $quote->setPaymentMethod($paymentMethod);
+
+        try {
+            $quote->save();
+            $quote->getPayment()->importData(['method' => $paymentMethod]);
+            $quote->collectTotals()->save();
+            return $this->quoteManagement->submit($quote);
+        } catch (\Exception $exception) {
+
+        }
+
     }
 
     private function initCachedData(): void
@@ -233,11 +216,15 @@ class Order implements FakerInterface
         $this->initedCustomers = true;
     }
 
-    private function getRandomCustomer(): Customer
+    private function getRandomCustomer(): ?CustomerInterface
     {
         $randKey = array_rand($this->cachedCustomers);
         if (is_null($this->cachedCustomers[$randKey])) {
-            $this->cachedCustomers[$randKey] = $this->customerRepository->getById($randKey);
+            try {
+                $this->cachedCustomers[$randKey] = $this->customerRepository->getById($randKey);
+            } catch (NoSuchEntityException $e) {
+                return null;
+            }
         }
 
         return $this->cachedCustomers[$randKey];
@@ -275,6 +262,12 @@ class Order implements FakerInterface
         $this->initedProducts = true;
     }
 
+    private function getProductType(): string
+    {
+        // TODO: make it radom to get simple|configurable|bundle
+        return 'simple';
+    }
+
     private function getRandomProduct(string $type): ProductInterface
     {
         $productCache = match($type) {
@@ -291,6 +284,8 @@ class Order implements FakerInterface
 
         return $this->$productCache[$randKey];
     }
+
+
 
     private function initShippingMethod(): void
     {
