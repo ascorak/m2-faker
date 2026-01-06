@@ -52,7 +52,7 @@ class Invoice extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(array $config, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): array
     {
         $orders      = $this->getOrders();
         $progressBar = new ProgressBar(
@@ -80,6 +80,7 @@ class Invoice extends AbstractFaker implements FakerInterface
             $progressBar->advance();
         }
         $progressBar->finish();
+        return [];
     }
 
     /**

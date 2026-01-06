@@ -71,7 +71,7 @@ class CustomerAddress extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(array $config, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): array
     {
         $customers = $this->customerCollectionFactory->create();
         $customers->addFieldToFilter('website_id', ['in' => $this->getStoreConfig('faker/global/website_ids')]);
@@ -117,6 +117,7 @@ class CustomerAddress extends AbstractFaker implements FakerInterface
         }
 
         $progressBar->finish();
+        return [];
     }
 
     /**

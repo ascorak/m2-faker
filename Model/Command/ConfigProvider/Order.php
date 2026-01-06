@@ -29,7 +29,11 @@ class Order extends AbstractConfigProvider
      */
     public function getConfig(): array
     {
-        return $this->getDefaultConfig();
+        $config = $this->getDefaultConfig();
+        $config[self::IDX_NUMBER_OF_ORDERS] = (int)$this->input->getArgument(Fake::NUMBER_ARGUMENT);
+        $config[self::IDX_GUEST_MODE] = self::GUEST_MODE_VALUE_CUSTOMER;
+
+        return $config;
     }
 
     /**
@@ -45,7 +49,7 @@ class Order extends AbstractConfigProvider
             self::IDX_MAX_QTY_PER_ITEM => 10,
             self::IDX_MAX_SIMPLE_PRODUCTS => 10,
             self::IDX_MAX_CONFIGURABLE_PRODUCTS => 10,
-            self::IDX_GUEST_MODE => 'both'
+            self::IDX_GUEST_MODE => self::GUEST_MODE_VALUE_BOTH
         ];
     }
 

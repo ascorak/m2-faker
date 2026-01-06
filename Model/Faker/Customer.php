@@ -61,7 +61,7 @@ class Customer extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(array $config, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): array
     {
         /** @var int[] $customerGroupIds */
         $customerGroupIds = $this->customerGroupCollectionFactory->create()->getAllIds();
@@ -109,5 +109,6 @@ class Customer extends AbstractFaker implements FakerInterface
 
             $progressBar->finish();
         }
+        return [];
     }
 }

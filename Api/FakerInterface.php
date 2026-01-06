@@ -10,9 +10,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 interface FakerInterface
 {
     /**
+     * Generate Fake data then return array of errors
      * @param array $config
      * @param SymfonyStyle $io
-     * @return void
+     * @return array
      */
-    public function generateFakeData(array $config, SymfonyStyle $io): void;
+    public function generateFakeData(array $config, SymfonyStyle $io): array;
 }

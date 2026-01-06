@@ -55,7 +55,7 @@ class Category extends AbstractFaker implements FakerInterface
      *
      * @return void
      */
-    public function generateFakeData(array $config, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): array
     {
         /*$this->faker    = $this->getFaker(0);
         $baseCategoryId = (int)$this->getStoreConfig('faker/category/parent');
@@ -76,6 +76,7 @@ class Category extends AbstractFaker implements FakerInterface
         }
 
         $progressBar->finish();*/
+        return [];
     }
 
     /**

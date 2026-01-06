@@ -19,9 +19,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 class Fake extends Command
 {
-    private const COMMAND_NAME = "ascorak:fake:generate";
-    private const CODE_ARGUMENT = 'code';
-    private const NUMBER_ARGUMENT = 'number';
+    public const COMMAND_NAME = "ascorak:fake:generate";
+    public const CODE_ARGUMENT = 'code';
+    public const NUMBER_ARGUMENT = 'number';
 
     /**
      * Fake constructor
@@ -66,25 +66,7 @@ class Fake extends Command
     public function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $numberOfOrder = (int)$input->getArgument(self::NUMBER_ARGUMENT);
 
-        $progressBar = $io->createProgressBar($numberOfOrder);
-        $progressBar->setFormat(
-            "<info>%message%</info> %current%/%max% [%bar%] %percent:3s%% %elapsed% %memory:6s%"
-        );
-        $progressBar->start();
-        $progressBar->setMessage('Orders ...');
-        $progressBar->display();
-
-        for ($i = 0; $i<$numberOfOrder; $i++) {
-            sleep(1);
-            $progressBar->advance();
-        }
-
-        $progressBar->finish();
-        $io->newLine(2);
-
-        return Command::SUCCESS;
         try {
             $this->appState->setAreaCode(Area::AREA_ADMINHTML);
         } catch (Exception $e) {
@@ -109,11 +91,21 @@ class Fake extends Command
         }
 
         foreach ($requestedCodes as $fakerCode) {
-            $fakerConfig = $this->configProviderStrategy->getConfig($fakerCode);
+            $fakerConfig = $this->configProviderStrategy->getConfigProvider($fakerCode);
+            $fakerConfig->setInput($input)->setOutput($output);
             $faker = $this->fakerProvider->getFaker($fakerCode);
-            $faker->generateFakeData($fakerConfig, $io);
+            $errors = $faker->generateFakeData($fakerConfig->getConfig(), $io);
+            $io->newLine(2);
+            if (!empty($errors)) {
+                foreach ($errors as $error) {
+                    $io->error($error);
+                }
+
+                $io->newLine(2);
+            }
         }
 
+        $io->newLine(2);
         $io->success('Fake data has been successfully generated');
         return Command::SUCCESS;
     }

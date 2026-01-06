@@ -3,6 +3,7 @@
 namespace Ascorak\Faker\Model\Faker\Generator;
 
 use Ascorak\Faker\Api\Generator\CustomerAddressGeneratorInterface;
+use Exception;
 use Faker\Factory;
 use Faker\Generator;
 use Magento\Customer\Api\Data\AddressInterface;
@@ -17,12 +18,21 @@ class CustomerAddressGenerator implements CustomerAddressGeneratorInterface
     private string $locale;
     private array $cachedCountryIds = [];
 
+    /**
+     * Constructor
+     * @param AddressInterfaceFactory $addressFactory
+     * @param ScopeConfigInterface $scopeConfig
+     * @param CountryCollectionFactory $countryCollectionFactory
+     */
     public function __construct(
         private AddressInterfaceFactory $addressFactory,
-        private ScopeConfigInterface $scopeConfig,
-        private CountryCollectionFactory $countryCollectionFactory
+        private ScopeConfigInterface             $scopeConfig,
+        private CountryCollectionFactory         $countryCollectionFactory
     ) {}
 
+    /**
+     * @inheritDoc
+     */
     public function generate(): AddressInterface
     {
         $address = $this->addressFactory->create();
@@ -41,6 +51,9 @@ class CustomerAddressGenerator implements CustomerAddressGeneratorInterface
         return $address;
     }
 
+    /**
+     * @return Generator
+     */
     private function getFaker(): Generator
     {
         if (!isset($this->faker)) {
@@ -51,6 +64,9 @@ class CustomerAddressGenerator implements CustomerAddressGeneratorInterface
         return $this->faker;
     }
 
+    /**
+     * @return string
+     */
     private function getLocale(): string
     {
         if (isset($this->locale)) {
@@ -60,6 +76,11 @@ class CustomerAddressGenerator implements CustomerAddressGeneratorInterface
         return $this->locale;
     }
 
+    /**
+     * @param string $countryName
+     * @return int
+     * @throws Exception
+     */
     private function getCountryId(string $countryName): int
     {
         if (!isset($this->cachedCountryIds[$countryName])) {
@@ -73,7 +94,7 @@ class CustomerAddressGenerator implements CustomerAddressGeneratorInterface
             }
 
             if (!isset($this->cachedCountryIds[$countryName])) {
-                throw new \Exception("Country $countryName not found");
+                throw new Exception("Country $countryName not found");
             }
         }
 

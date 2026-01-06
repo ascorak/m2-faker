@@ -1,28 +1,25 @@
 <?php
 namespace Ascorak\Faker\Model\Faker;
 
-use Ascorak\Faker\Api\Command\ConfigProviderInterface;
 use Ascorak\Faker\Api\FakerInterface;
+use Ascorak\Faker\Api\Generator\CustomerAddressGeneratorInterface;
+use Ascorak\Faker\Api\Generator\EntityGeneratorInterface;
+use Ascorak\Faker\Api\Generator\GeneratorProviderInterface;
+use Ascorak\Faker\Model\Command\ConfigProvider\Order as OrderConfigProvider;
+use Exception;
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
-use Magento\Catalog\Model\ProductFactory;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
-use Magento\CatalogInventory\Helper\Stock;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
-use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Quote\Api\CartManagementInterface;
 use Magento\Quote\Model\QuoteFactory;
-use Magento\Quote\Model\QuoteManagement;
 use Magento\Sales\Api\Data\OrderInterface;
-use Magento\Store\Model\ResourceModel\Store\CollectionFactory as StoreCollectionFactory;
 use Magento\Store\Model\ScopeInterface;
-use Magento\Store\Model\StoreManagerInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
-use Ascorak\Faker\Model\Command\ConfigProvider\Order as OrderConfigProvider;
 
 /**
  * @author Grare Olivier <grare.o@gmail.com>
@@ -30,30 +27,6 @@ use Ascorak\Faker\Model\Command\ConfigProvider\Order as OrderConfigProvider;
 class Order implements FakerInterface
 {
     private const CACHE_COLLECTION_SIZE = 20;
-    /**
-     * @var StoreManagerInterface
-     */
-    protected $storeManager;
-    /**
-     * @var QuoteFactory
-     */
-    protected $quoteFactory;
-    /**
-     * @var ProductFactory
-     */
-    protected $productFactory;
-    /**
-     * @var QuoteManagement
-     */
-    protected $quoteManagement;
-    /**
-     * @var SearchCriteriaBuilder
-     */
-    protected $searchCriteriaBuilder;
-    /**
-     * @var Stock $stockFilter
-     */
-    protected $stockFilter;
 
     private array $cachedCustomers = [];
     private bool $initedCustomers = false;
@@ -72,40 +45,25 @@ class Order implements FakerInterface
     /**
      * Order constructor.
      *
-     * @param ScopeConfigInterface        $scopeConfig
-     * @param StoreCollectionFactory      $storeCollectionFactory
+     * @param CartManagementInterface $quoteManagement
+     * @param QuoteFactory $quoteFactory
+     * @param ScopeConfigInterface $scopeConfig
+     * @param ProductRepositoryInterface $productRepository
+     * @param ProductCollectionFactory $productCollectionFactory
      * @param CustomerRepositoryInterface $customerRepository
-     * @param StoreManagerInterface       $storeManager
-     * @param QuoteFactory                $quoteFactory
-     * @param ProductFactory              $productFactory
-     * @param CartManagementInterface     $quoteManagement
-     * @param SearchCriteriaBuilder       $searchCriteriaBuilder
-     * @param ProductCollectionFactory           $productCollectionFactory
-     * @param Stock                       $stockFilter
+     * @param CustomerCollectionFactory $customerCollectionFactory
+     * @param GeneratorProviderInterface $generatorProvider
      */
     public function __construct(
-        StoreCollectionFactory $storeCollectionFactory,
-        StoreManagerInterface $storeManager,
-        QuoteFactory $quoteFactory,
-        ProductFactory $productFactory,
-        CartManagementInterface $quoteManagement,
-        SearchCriteriaBuilder $searchCriteriaBuilder,
-        Stock $stockFilter,
+        private CartManagementInterface $quoteManagement,
+        private QuoteFactory $quoteFactory,
         private ScopeConfigInterface $scopeConfig,
         private ProductRepositoryInterface $productRepository,
         private ProductCollectionFactory $productCollectionFactory,
         private CustomerRepositoryInterface $customerRepository,
-        private CustomerCollectionFactory $customerCollectionFactory
-    ) {
-        //parent::__construct($scopeConfig, $storeCollectionFactory);
-
-        $this->storeManager             = $storeManager;
-        $this->quoteFactory             = $quoteFactory;
-        $this->productFactory           = $productFactory;
-        $this->quoteManagement          = $quoteManagement;
-        $this->searchCriteriaBuilder    = $searchCriteriaBuilder;
-        $this->stockFilter              = $stockFilter;
-    }
+        private CustomerCollectionFactory $customerCollectionFactory,
+        private GeneratorProviderInterface $generatorProvider
+    ) {}
 
     /**
      * @param array $config
@@ -113,8 +71,9 @@ class Order implements FakerInterface
      * @return void
      * @throws NoSuchEntityException
      */
-    public function generateFakeData(array $config, SymfonyStyle $io): void
+    public function generateFakeData(array $config, SymfonyStyle $io): array
     {
+        $errors = [];
         $this->initCachedData();
 
         $progressBar = $io->createProgressBar($config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS]);
@@ -127,19 +86,25 @@ class Order implements FakerInterface
             OrderConfigProvider::GUEST_MODE_VALUE_GUEST => 0,
             OrderConfigProvider::GUEST_MODE_VALUE_CUSTOMER => $config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS],
             OrderConfigProvider::GUEST_MODE_VALUE_BOTH => rand(1, $config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS]),
-            default => throw new \Exception(__("Problem\n"))
+            default => throw new Exception(__("Problem\n"))
         };
 
         for($i = 0; $i < $customerNumber; $i++) {
-            if ($i < $customerNumber) {
-                $order = $this->createOrder($config, $this->getRandomCustomer());
-            } else {
-                $order = $this->createOrder($config);
+            try {
+                if ($i < $customerNumber) {
+                    $order = $this->createOrder($config, $this->getRandomCustomer());
+                } else {
+                    $order = $this->createOrder($config);
+                }
+            } catch (Exception $e) {
+                $errors[] = $e->getMessage();
             }
 
             $progressBar->advance();
         }
         $progressBar->finish();
+
+        return $errors;
     }
 
     private function createOrder(array $config, ?CustomerInterface $customer = null): OrderInterface
@@ -160,7 +125,10 @@ class Order implements FakerInterface
         if ($customer) {
             $customerAddresses = $customer->getAddresses();
             if (empty($customerAddresses)) {
-                // TODO: add dummy address to $customerAddresses and add it to the customer
+                $addressGenerator = $this->getAddressGenerator();
+                $customerAddress = $addressGenerator->generate();
+                $customerAddresses[] = $customerAddress;
+                $customer->setAddresses([$customerAddress]);
             }
             $quote->assignCustomerWithAddressChange(
                 $customer,
@@ -177,15 +145,11 @@ class Order implements FakerInterface
         $paymentMethod = $this->getRandomPaymentMethod();
         $quote->setPaymentMethod($paymentMethod);
 
-        try {
-            $quote->save();
-            $quote->getPayment()->importData(['method' => $paymentMethod]);
-            $quote->collectTotals()->save();
-            return $this->quoteManagement->submit($quote);
-        } catch (\Exception $exception) {
-
-        }
-
+        // submit quote
+        $quote->save();
+        $quote->getPayment()->importData(['method' => $paymentMethod]);
+        $quote->collectTotals()->save();
+        return $this->quoteManagement->submit($quote);
     }
 
     private function initCachedData(): void
@@ -209,7 +173,7 @@ class Order implements FakerInterface
             ->setCurPage(1)
             ->setPageSize(self::CACHE_COLLECTION_SIZE);
         $collection->getSelect()
-            ->join(['adrs' => $collection->getTable('customer_address_entity')], 'adrs.parent_id = man_table.entity_id', [], 'inner')
+            ->joinInner(['adrs' => $collection->getTable('customer_address_entity')], 'adrs.parent_id = e.entity_id', [])
             ->order('RAND()');
 
         $this->cachedCustomers = array_fill_keys($collection->getAllIds(), null);
@@ -237,7 +201,7 @@ class Order implements FakerInterface
         }
         $simpleProductCollection = $this->productCollectionFactory->create();
         $simpleProductCollection->addAttributeToSelect(['entity_id'])
-            ->addFieldToFilter('type', ['eq' => 'simple'])
+            ->addFieldToFilter('type_id', ['eq' => 'simple'])
             ->setCurPage(1)
             ->setPageSize(self::CACHE_COLLECTION_SIZE);
         $simpleProductCollection->getSelect()->order('RAND()');
@@ -245,7 +209,7 @@ class Order implements FakerInterface
 
         $configurableProductCollection = $this->productCollectionFactory->create();
         $configurableProductCollection->addAttributeToSelect(['entity_id'])
-            ->addFieldToFilter('type', ['eq' => 'configurable'])
+            ->addFieldToFilter('type_id', ['eq' => 'configurable'])
             ->setCurPage(1)
             ->setPageSize(self::CACHE_COLLECTION_SIZE);
         $configurableProductCollection->getSelect()->order('RAND()');
@@ -253,7 +217,7 @@ class Order implements FakerInterface
 
         $bundleProductCollection = $this->productCollectionFactory->create();
         $bundleProductCollection->addAttributeToSelect(['entity_id'])
-            ->addFieldToFilter('type', ['eq' => 'bundle'])
+            ->addFieldToFilter('type_id', ['eq' => 'bundle'])
             ->setCurPage(1)
             ->setPageSize(self::CACHE_COLLECTION_SIZE);
         $bundleProductCollection->getSelect()->order('RAND()');
@@ -268,13 +232,19 @@ class Order implements FakerInterface
         return 'simple';
     }
 
+    /**
+     * @param string $type
+     * @return ProductInterface
+     * @throws NoSuchEntityException
+     * @throws Exception
+     */
     private function getRandomProduct(string $type): ProductInterface
     {
         $productCache = match($type) {
             'simple' => 'cachedSimpleProducts',
             'configurable' => 'cachedConfigurableProducts',
             'bundle' => 'cachedBundleProducts',
-            default => throw new \Exception(__("Problem\n"))
+            default => throw new Exception(__("Problem\n"))
         };
 
         $randKey = array_rand($this->$productCache);
@@ -285,8 +255,9 @@ class Order implements FakerInterface
         return $this->$productCache[$randKey];
     }
 
-
-
+    /**
+     * @return void
+     */
     private function initShippingMethod(): void
     {
         if ($this->initedShippingMethods) {
@@ -297,11 +268,17 @@ class Order implements FakerInterface
         $this->initedShippingMethods = true;
     }
 
+    /**
+     * @return string
+     */
     private function getRandomShippingMethod(): string
     {
         return $this->cachedShippingMethods[rand(0, count($this->cachedShippingMethods) - 1)];
     }
 
+    /**
+     * @return void
+     */
     private function initPaymentMethod(): void
     {
         if ($this->initedPaymentMethods) {
@@ -312,8 +289,19 @@ class Order implements FakerInterface
         $this->initedPaymentMethods = true;
     }
 
+    /**
+     * @return string
+     */
     private function getRandomPaymentMethod(): string
     {
         return $this->cachedPaymentMethods[rand(0, count($this->cachedPaymentMethods) - 1)];
+    }
+
+    /**
+     * @return EntityGeneratorInterface
+     */
+    private function getAddressGenerator(): EntityGeneratorInterface
+    {
+        return $this->generatorProvider->getGenerator(CustomerAddressGeneratorInterface::GENERATOR_CODE);
     }
 }

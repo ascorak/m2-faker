@@ -4,6 +4,7 @@
     <!-- PREFERENCES -->
     <preference for="Ascorak\Faker\Api\FakerProviderInterface" type="Ascorak\Faker\Model\FakerProvider" />
     <preference for="Ascorak\Faker\Api\Generator\CustomerAddressGeneratorInterface" type="Ascorak\Faker\Model\Faker\Generator\CustomerAddressGenerator" />
+    <preference for="Ascorak\Faker\Api\Generator\GeneratorProviderInterface" type="Ascorak\Faker\Model\Faker\Generator\GeneratorProvider" />
 
     <!-- ARGUMENTS -->
     <type name="Magento\Framework\Console\CommandList">
@@ -11,6 +12,12 @@
             <argument name="commands" xsi:type="array">
                 <item name="ascorak_faker_fake" xsi:type="object">Ascorak\Faker\Console\Command\Fake</item>
             </argument>
+        </arguments>
+    </type>
+
+    <type name="Ascorak\Faker\Model\Faker\Order">
+        <arguments>
+            <argument name="generatorProvider" xsi:type="object">Ascorak\Faker\Model\Faker\Generator\GeneratorProvider\Proxy</argument>
         </arguments>
     </type>
 
@@ -39,6 +46,14 @@
     <type name="Ascorak\Faker\Model\Faker\Order">
         <arguments>
             <argument name="quoteManagement" xsi:type="object">Magento\Quote\Model\QuoteManagement\Proxy</argument>
+        </arguments>
+    </type>
+
+    <type name="Ascorak\Faker\Model\Faker\Generator\GeneratorProvider">
+        <arguments>
+            <argument name="generators" xsi:type="array">
+                <item name="customer_address" xsi:type="object">Ascorak\Faker\Api\Generator\CustomerAddressGeneratorInterface</item>
+            </argument>
         </arguments>
     </type>
 </config>

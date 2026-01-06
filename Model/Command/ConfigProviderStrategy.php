@@ -26,7 +26,7 @@ class ConfigProviderStrategy
      * @param string $code
      * @return ConfigProviderInterface
      */
-    public function getConfig(string $code): ConfigProviderInterface
+    public function getConfigProvider(string $code): ConfigProviderInterface
     {
         if (!isset($this->configProviders[$code])) {
             throw new InvalidArgumentException(sprintf('The config provider "%s" does not exist', $code));
