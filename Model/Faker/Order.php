@@ -12,14 +12,23 @@ use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
+use Magento\Customer\Api\Data\AddressInterface as CustomerAddressInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
+use Magento\Framework\Event\ManagerInterface as EventManagerInterface;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Quote\Api\CartManagementInterface;
+use Magento\Quote\Api\Data\AddressInterface as QuoteAddressInterface;
+use Magento\Quote\Api\Data\CartInterface;
+use Magento\Quote\Api\Data\CartItemInterface;
 use Magento\Quote\Model\QuoteFactory;
+use Magento\Quote\Model\Quote\ItemFactory as QuoteItemFactory;
+use Magento\Quote\Model\Quote\AddressFactory as QuoteAddressFactory;
 use Magento\Sales\Api\Data\OrderInterface;
 use Magento\Store\Model\ScopeInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
+use Magento\Quote\Model\Quote\Address\RateFactory;
 
 /**
  * @author Grare Olivier <grare.o@gmail.com>
@@ -47,7 +56,10 @@ class Order implements FakerInterface
      *
      * @param CartManagementInterface $quoteManagement
      * @param QuoteFactory $quoteFactory
+     * @param QuoteItemFactory $quoteItemFactory
+     * @param QuoteAddressFactory $quoteAddressFactory
      * @param ScopeConfigInterface $scopeConfig
+     * @param EventManagerInterface $eventManager
      * @param ProductRepositoryInterface $productRepository
      * @param ProductCollectionFactory $productCollectionFactory
      * @param CustomerRepositoryInterface $customerRepository
@@ -57,24 +69,29 @@ class Order implements FakerInterface
     public function __construct(
         private CartManagementInterface $quoteManagement,
         private QuoteFactory $quoteFactory,
+        private QuoteItemFactory $quoteItemFactory,
+        private QuoteAddressFactory $quoteAddressFactory,
         private ScopeConfigInterface $scopeConfig,
+        private EventManagerInterface $eventManager,
         private ProductRepositoryInterface $productRepository,
         private ProductCollectionFactory $productCollectionFactory,
         private CustomerRepositoryInterface $customerRepository,
         private CustomerCollectionFactory $customerCollectionFactory,
-        private GeneratorProviderInterface $generatorProvider
+        private GeneratorProviderInterface $generatorProvider,
+        private RateFactory $rateFactory
     ) {}
 
     /**
      * @param array $config
      * @param SymfonyStyle $io
-     * @return void
-     * @throws NoSuchEntityException
+     * @return array
+     * @throws LocalizedException
      */
     public function generateFakeData(array $config, SymfonyStyle $io): array
     {
         $errors = [];
-        $this->initCachedData();
+        $successes = [];
+        $this->initCachedData($config);
 
         $progressBar = $io->createProgressBar($config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS]);
         $progressBar->setFormat('<info>%message%</info> %current%/%max% [%bar%] %percent:3s%% %elapsed% %memory:6s%');
@@ -89,13 +106,14 @@ class Order implements FakerInterface
             default => throw new Exception(__("Problem\n"))
         };
 
-        for($i = 0; $i < $customerNumber; $i++) {
+        for($i = 0; $i < $config[OrderConfigProvider::IDX_NUMBER_OF_ORDERS]; $i++) {
             try {
                 if ($i < $customerNumber) {
                     $order = $this->createOrder($config, $this->getRandomCustomer());
                 } else {
                     $order = $this->createOrder($config);
                 }
+                $successes[] = __('Created Order #%1.', $order->getIncrementId());
             } catch (Exception $e) {
                 $errors[] = $e->getMessage();
             }
@@ -104,22 +122,31 @@ class Order implements FakerInterface
         }
         $progressBar->finish();
 
-        return $errors;
+        return ['errors' => $errors, 'successes' => $successes];
     }
 
+    /**
+     * @param array $config
+     * @param CustomerInterface|null $customer
+     * @return OrderInterface
+     * @throws LocalizedException
+     * @throws NoSuchEntityException
+     */
     private function createOrder(array $config, ?CustomerInterface $customer = null): OrderInterface
     {
         // create quote
         $quote = $this->quoteFactory->create();
-        $quote->setStoreId(0); // admin store
-        $quote->setInventoryProcessed(false);
+        $quote->setStoreId(0) // admin store
+            ->setIsActive(true)
+            ->setInventoryProcessed(true);
+        $this->eventManager->dispatch('faker_order_quote_created', ['quote' => $quote]);
 
         // add product
         $itemNumber = rand(1, $config[OrderConfigProvider::IDX_MAX_ITEMS_PER_ORDER]);
         for($i = 0; $i < $itemNumber; $i++) {
-            $product = $this->getRandomProduct($this->getProductType());
-            $quote->addProduct($product, rand(1, $config[OrderConfigProvider::IDX_MAX_QTY_PER_ITEM]));
+            $quote->addItem($this->createQuoteItem($config));
         }
+        $this->eventManager->dispatch('faker_order_quote_add_products_after', ['quote' => $quote]);
 
         // add customer data
         if ($customer) {
@@ -132,38 +159,93 @@ class Order implements FakerInterface
             }
             $quote->assignCustomerWithAddressChange(
                 $customer,
-                $customerAddresses[array_rand($customerAddresses)],
-                $customerAddresses[array_rand($customerAddresses)]
+                $this->convertToQuoteAddress($customerAddresses[array_rand($customerAddresses)]),
+                $this->convertToQuoteAddress($customerAddresses[array_rand($customerAddresses)])
             );
         } else {
             // TODO: add dummy customer data to quote
         }
-        $quote->setCollectShippingRates(1)->collectShippingRates();
+        $this->eventManager->dispatch('faker_order_quote_add_customer_after', ['quote' => $quote]);
 
         // add shipment and payment
-        $quote->setShippingMethod($this->getRandomShippingMethod());
+        $this->applyShippingMethod($quote);
         $paymentMethod = $this->getRandomPaymentMethod();
-        $quote->setPaymentMethod($paymentMethod);
+        $quote->getPayment()->setMethod($paymentMethod);
 
         // submit quote
+        $quote->collectTotals();
         $quote->save();
-        $quote->getPayment()->importData(['method' => $paymentMethod]);
-        $quote->collectTotals()->save();
-        return $this->quoteManagement->submit($quote);
-    }
-
-    private function initCachedData(): void
-    {
-        $this->initShippingMethod();
-        $this->initPaymentMethod();
-        $this->initCustomers();
-        $this->initProducts();
+        $this->eventManager->dispatch('faker_order_quote_submit_before', ['quote' => $quote]);
+        $return = $this->quoteManagement->submit($quote);
+        return $return;
     }
 
     /**
-     * @return CustomerInterface[]
+     * @param array $config
+     * @return CartItemInterface
+     * @throws NoSuchEntityException
      */
-    private function initCustomers(): void
+    private function createQuoteItem(array $config): CartItemInterface
+    {
+        $product = $this->getRandomProduct($this->getProductType());
+        $quoteItem = $this->quoteItemFactory->create();
+        $quoteItem->setProduct($product)
+            ->setQty(rand(1, $config[OrderConfigProvider::IDX_MAX_ITEMS_PER_ORDER]))
+            ->setIsInStock(true);
+        // TODO: add product options for configurable and bundle products
+
+        return $quoteItem;
+    }
+
+    /**
+     * @param CustomerAddressInterface $address
+     * @return QuoteAddressInterface
+     */
+    private function convertToQuoteAddress(CustomerAddressInterface $address): QuoteAddressInterface
+    {
+        $quoteAddress = $this->quoteAddressFactory->create();
+        return $quoteAddress->importCustomerAddressData($address);
+    }
+
+    /**
+     * @param CartInterface $quote
+     * @return void
+     */
+    private function applyShippingMethod(CartInterface $quote): void
+    {
+        $shippingMethod = $this->getRandomShippingMethod();
+        $shippingAddress = $quote->getShippingAddress();
+        $shippingRate = $this->rateFactory->create(['data' =>[
+            'code' => $shippingMethod,
+            'price' => rand(10, 100)
+        ]]);
+
+        $shippingAddress->setCollectShippingRates(true)
+            ->collectShippingRates()
+            ->setShippingMethod($shippingMethod)
+            ->addShippingRate($shippingRate);
+        $this->eventManager->dispatch('faker_order_quote_apply_shipping_method_after', ['quote' => $quote]);
+    }
+
+    /**
+     * @param array $config
+     * @return void
+     * @throws LocalizedException
+     */
+    private function initCachedData(array $config): void
+    {
+        $this->initShippingMethod($config);
+        $this->initPaymentMethod($config);
+        $this->initCustomers($config);
+        $this->initProducts($config);
+    }
+
+    /**
+     * @param array $config
+     * @return void
+     * @throws LocalizedException
+     */
+    private function initCustomers(array $config): void
     {
         if ($this->initedCustomers) {
             return;
@@ -175,11 +257,16 @@ class Order implements FakerInterface
         $collection->getSelect()
             ->joinInner(['adrs' => $collection->getTable('customer_address_entity')], 'adrs.parent_id = e.entity_id', [])
             ->order('RAND()');
+        $this->eventManager->dispatch('faker_order_customer_collection_before_load', ['collection' => $collection]);
 
         $this->cachedCustomers = array_fill_keys($collection->getAllIds(), null);
         $this->initedCustomers = true;
     }
 
+    /**
+     * @return CustomerInterface|null
+     * @throws LocalizedException
+     */
     private function getRandomCustomer(): ?CustomerInterface
     {
         $randKey = array_rand($this->cachedCustomers);
@@ -194,7 +281,11 @@ class Order implements FakerInterface
         return $this->cachedCustomers[$randKey];
     }
 
-    private function initProducts(): void
+    /**
+     * @param array $config
+     * @return void
+     */
+    private function initProducts(array $config): void
     {
         if ($this->initedProducts) {
             return;
@@ -205,6 +296,7 @@ class Order implements FakerInterface
             ->setCurPage(1)
             ->setPageSize(self::CACHE_COLLECTION_SIZE);
         $simpleProductCollection->getSelect()->order('RAND()');
+        $this->eventManager->dispatch('faker_order_simple_product_collection_before_load', ['collection' => $simpleProductCollection]);
         $this->cachedSimpleProducts = array_fill_keys($simpleProductCollection->getAllIds(), null);
 
         $configurableProductCollection = $this->productCollectionFactory->create();
@@ -213,6 +305,7 @@ class Order implements FakerInterface
             ->setCurPage(1)
             ->setPageSize(self::CACHE_COLLECTION_SIZE);
         $configurableProductCollection->getSelect()->order('RAND()');
+        $this->eventManager->dispatch('faker_order_configurable_product_collection_before_load', ['collection' => $configurableProductCollection]);
         $this->cachedConfigurableProducts = array_fill_keys($configurableProductCollection->getAllIds(), null);
 
         $bundleProductCollection = $this->productCollectionFactory->create();
@@ -221,11 +314,15 @@ class Order implements FakerInterface
             ->setCurPage(1)
             ->setPageSize(self::CACHE_COLLECTION_SIZE);
         $bundleProductCollection->getSelect()->order('RAND()');
+        $this->eventManager->dispatch('faker_order_bundle_product_collection_before_load', ['collection' => $bundleProductCollection]);
         $this->cachedBundleProducts = array_fill_keys($bundleProductCollection->getAllIds(), null);
 
         $this->initedProducts = true;
     }
 
+    /**
+     * @return string
+     */
     private function getProductType(): string
     {
         // TODO: make it radom to get simple|configurable|bundle
@@ -256,15 +353,23 @@ class Order implements FakerInterface
     }
 
     /**
+     * @param array $config
      * @return void
      */
-    private function initShippingMethod(): void
+    private function initShippingMethod(array $config): void
     {
         if ($this->initedShippingMethods) {
             return;
         }
 
-        $this->cachedShippingMethods = array_keys($this->scopeConfig->getValue('carriers', ScopeInterface::SCOPE_STORE, 0));
+        $carriers = $this->scopeConfig->getValue('carriers', ScopeInterface::SCOPE_STORE, 0);
+        foreach ($carriers as $shippingMethodCode => $carrier) {
+            if (!isset($carrier['active']) || !$carrier['active']) {
+                continue;
+            }
+            $this->cachedShippingMethods[] = $shippingMethodCode;
+        }
+
         $this->initedShippingMethods = true;
     }
 
@@ -277,15 +382,25 @@ class Order implements FakerInterface
     }
 
     /**
+     * @param array $config
      * @return void
      */
-    private function initPaymentMethod(): void
+    private function initPaymentMethod(array $config): void
     {
         if ($this->initedPaymentMethods) {
             return;
         }
 
-        $this->cachedPaymentMethods = array_keys($this->scopeConfig->getValue('payment', ScopeInterface::SCOPE_STORE, 0));
+        $paymentMethods = array_keys($this->scopeConfig->getValue('payment', ScopeInterface::SCOPE_STORE, 0));
+        foreach ($paymentMethods as $paymentMethod) {
+            if ($this->scopeConfig->getValue(
+                sprintf('payment/%s/active', $paymentMethod),
+                ScopeInterface::SCOPE_STORE,
+                0
+            )) {
+                $this->cachedPaymentMethods[] = $paymentMethod;
+            }
+        }
         $this->initedPaymentMethods = true;
     }
 
@@ -294,7 +409,8 @@ class Order implements FakerInterface
      */
     private function getRandomPaymentMethod(): string
     {
-        return $this->cachedPaymentMethods[rand(0, count($this->cachedPaymentMethods) - 1)];
+        //return $this->cachedPaymentMethods[rand(0, count($this->cachedPaymentMethods) - 1)];
+        return 'checkmo';
     }
 
     /**

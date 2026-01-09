@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="faker_order_quote_created">
+        <observer name="faker_order_add_seller_id" instance="Ascorak\Faker\Observer\FakerOrder\AddSellerObserver" />
+    </event>
+    <event name="faker_order_quote_submit_before">
+        <observer name="faker_order_replicate_items_in_order" instance="Ascorak\Faker\Observer\FakerOrder\ReplicateItemsObserver" />
+    </event>
+    <event name="faker_order_quote_apply_shipping_method_after">
+        <observer name="faker_order_correct_shipping_method" instance="Ascorak\Faker\Observer\FakerOrder\CorrectShippingMethodObserver" />
+    </event>
+</config>

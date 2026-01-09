@@ -94,10 +94,15 @@ class Fake extends Command
             $fakerConfig = $this->configProviderStrategy->getConfigProvider($fakerCode);
             $fakerConfig->setInput($input)->setOutput($output);
             $faker = $this->fakerProvider->getFaker($fakerCode);
-            $errors = $faker->generateFakeData($fakerConfig->getConfig(), $io);
+            $return = $faker->generateFakeData($fakerConfig->getConfig(), $io);
             $io->newLine(2);
-            if (!empty($errors)) {
-                foreach ($errors as $error) {
+            if (!empty($return['successes'])) {
+                foreach ($return['successes'] as $success) {
+                    $io->success($success);
+                }
+            }
+            if (!empty($return['errors'])) {
+                foreach ($return['errors'] as $error) {
                     $io->error($error);
                 }
 
